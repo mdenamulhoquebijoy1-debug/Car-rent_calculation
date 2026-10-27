@@ -28,8 +28,8 @@ const allCars = 'সব গাড়ি';
 const noDrv = 'ড্রাইভার নেই';
 
 String fm(num n) => n % 1 == 0 ? n.toInt().toString() : n.toStringAsFixed(2);
-String fd(DateTime d) => '\( {d.day}/ \){d.month}/${d.year}';
-String mk(DateTime d) => '\( {d.year}- \){d.month.toString().padLeft(2, '0')}';
+String fd(DateTime d) => '${d.day}/${d.month}/${d.year}';
+String mk(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
 double n0(dynamic v) => (v as num?)?.toDouble() ?? 0;
 double inc(M e) => e['type'] == 'out' || e['type'] == 'self' ? 0 : n0(e['amt']);
 double ex(M e) => e['type'] == 'out' ? n0(e['amt']) : (e['type'] == 'trip' || e['type'] == 'self') ? n0(e['cost']) : 0;
@@ -205,9 +205,9 @@ class _HomeState extends State<Home> {
           Text('মাসিক বেতন: ৳${fm(sal)}'),
           Text('এই মাসে ট্রিপ/ব্যবহার: ${trips.length} টি'),
           Text('ট্রিপ থেকে দিয়েছি: ৳${fm(tripPays)}'),
-          Text('বেতন দিয়েছি: ৳\( {fm(paid)}  •  অগ্রিম: ৳ \){fm(adv)}'),
+          Text('বেতন দিয়েছি: ৳${fm(paid)}  •  অগ্রিম: ৳${fm(adv)}'),
           const SizedBox(height: 4),
-          Text(bal >= 0 ? 'বাকি: ৳\( {fm(bal)}' : 'বেশি দেওয়া হয়েছে: ৳ \){fm(-bal)}',
+          Text(bal >= 0 ? 'বাকি: ৳${fm(bal)}' : 'বেশি দেওয়া হয়েছে: ৳${fm(-bal)}',
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: bal > 0 ? Colors.deepOrange : Colors.teal)),
@@ -240,7 +240,7 @@ class _HomeState extends State<Home> {
         IconButton(
             onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)),
             icon: const Icon(Icons.chevron_left)),
-        Text('\( {month.month}/ \){month.year}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('${month.month}/${month.year}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         IconButton(
             onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)),
             icon: const Icon(Icons.chevron_right)),
@@ -330,8 +330,8 @@ class _HomeState extends State<Home> {
                 color: days <= 7 ? Colors.red : Colors.teal),
             title: Text(r['title']),
             subtitle: Text(days < 0
-                ? 'মেয়াদ শেষ \( {-days} দিন আগে ( \){fd(DateTime.parse(r['date']))})'
-                : '\( days দিন বাকি ( \){fd(DateTime.parse(r['date']))})'),
+                ? 'মেয়াদ শেষ ${-days} দিন আগে (${fd(DateTime.parse(r['date']))})'
+                : '$days দিন বাকি (${fd(DateTime.parse(r['date']))})'),
             trailing: IconButton(
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () async {
@@ -365,7 +365,7 @@ class _HomeState extends State<Home> {
           '${e['car']}',
           fd(d),
           if (e['driver'] != null) 'ড্রাইভার: ${e['driver']}',
-          if (trip) 'ভাড়া ৳\( {fm(n0(e['amt']))} − খরচ ৳ \){fm(n0(e['cost']))}',
+          if (trip) 'ভাড়া ৳${fm(n0(e['amt']))} − খরচ ৳${fm(n0(e['cost']))}',
           if (self) 'নিজে ব্যবহার খরচ ৳${fm(n0(e['cost']))}',
           if (n0(e['driver_pay']) > 0) 'ড্রাইভার পেয়েছে ৳${fm(n0(e['driver_pay']))}',
           if (n0(e['due']) > 0) 'বাকি ৳${fm(n0(e['due']))}',
@@ -379,7 +379,7 @@ class _HomeState extends State<Home> {
               ? 'ট্রিপ  •  লাভ ৳${fm(profit)}'
               : self
                   ? 'নিজে ব্যবহার  •  খরচ ৳${fm(n0(e['cost']))}'
-                  : '\( {e['cat']}  •  ৳ \){fm(n0(e['amt']))}'),
+                  : '${e['cat']}  •  ৳${fm(n0(e['amt']))}'),
           subtitle: Text(parts.join('  •  ')),
           onTap: () => addEdit(e),
           trailing: IconButton(
@@ -418,7 +418,7 @@ class _HomeState extends State<Home> {
       sumCard('সর্বমোট লাভ/লোকসান', l,
           extra: trips.isEmpty
               ? null
-              : 'মোট ট্রিপ \( {trips.length} টি  •  প্রতি ট্রিপে গড় লাভ ৳ \){fm(tp / trips.length)}'),
+              : 'মোট ট্রিপ ${trips.length} টি  •  প্রতি ট্রিপে গড় লাভ ৳${fm(tp / trips.length)}'),
       head('মাসভিত্তিক হিসাব'),
       for (final k in keys)
         Builder(builder: (c) {
@@ -428,8 +428,8 @@ class _HomeState extends State<Home> {
             title: Text(k),
             isThreeLine: true,
             subtitle: Text(
-                'আয় ৳\( {fm(sIn(mm))}  •  খরচ ৳ \){fm(sEx(mm))}\nসার্ভিস/মেরামত/টায়ার ৳${fm(svcOf(mm))}'),
-            trailing: Text('\( {pr >= 0 ? 'লাভ' : 'লোকসান'}\n৳ \){fm(pr.abs())}',
+                'আয় ৳${fm(sIn(mm))}  •  খরচ ৳${fm(sEx(mm))}\nসার্ভিস/মেরামত/টায়ার ৳${fm(svcOf(mm))}'),
+            trailing: Text('${pr >= 0 ? 'লাভ' : 'লোকসান'}\n৳${fm(pr.abs())}',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                     fontWeight: FontWeight.bold,

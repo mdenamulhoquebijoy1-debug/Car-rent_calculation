@@ -17,6 +17,14 @@ jobs:
       - run: flutter create --platforms=android --project-name car_hisab .
       - run: flutter pub get
       - run: flutter build apk --release
+      - name: Sign APK
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/my.jks"
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" sign --ks "$RUNNER_TEMP/my.jks" --ks-key-alias carhisab --ks-pass env:KS_PASS --key-pass env:KS_PASS build/app/outputs/flutter-apk/app-release.apk
       - uses: actions/upload-artifact@v4
         with:
           name: car-hisab-apk

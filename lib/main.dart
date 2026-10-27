@@ -28,11 +28,11 @@ const allCars = 'সব গাড়ি';
 const noDrv = 'ড্রাইভার নেই';
 
 String fm(num n) => n % 1 == 0 ? n.toInt().toString() : n.toStringAsFixed(2);
-String fd(DateTime d) => '${d.day}/${d.month}/${d.year}';
-String mk(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}';
+String fd(DateTime d) => '\( {d.day}/ \){d.month}/${d.year}';
+String mk(DateTime d) => '\( {d.year}- \){d.month.toString().padLeft(2, '0')}';
 double n0(dynamic v) => (v as num?)?.toDouble() ?? 0;
-double inc(M e) => e['type'] == 'out' ? 0 : n0(e['amt']);
-double ex(M e) => e['type'] == 'out' ? n0(e['amt']) : e['type'] == 'trip' ? n0(e['cost']) : 0;
+double inc(M e) => e['type'] == 'out' || e['type'] == 'self' ? 0 : n0(e['amt']);
+double ex(M e) => e['type'] == 'out' ? n0(e['amt']) : (e['type'] == 'trip' || e['type'] == 'self') ? n0(e['cost']) : 0;
 double sIn(Iterable<M> l) => l.fold<double>(0, (s, e) => s + inc(e));
 double sEx(Iterable<M> l) => l.fold<double>(0, (s, e) => s + ex(e));
 double sDue(Iterable<M> l) => l.fold<double>(0, (s, e) => s + n0(e['due']));
@@ -121,122 +121,23 @@ class _HomeState extends State<Home> {
     return l;
   }
 
-  // ---------- entry form ----------
   Future<void> addEdit([M? old]) async {
-    String t = (old?['type'] ?? 'out') as String;
-    final carC = TextEditingController(
-        text: old?['car'] ??
-            (car != allCars ? car : (cars.isNotEmpty ? cars.first : 'আমার গাড়ি')));
-    final amtC = TextEditingController(text: old == null ? '' : fm(n0(old['amt'])));
-    final costC = TextEditingController(
-        text: old == null || n0(old['cost']) == 0 ? '' : fm(n0(old['cost'])));
-    final dueC = TextEditingController(
-        text: old == null || n0(old['due']) == 0 ? '' : fm(n0(old['due'])));
-    final noteC = TextEditingController(text: old?['note'] ?? '');
-    String cat = old?['cat'] ?? outCats.first;
-    String drv = old?['driver'] ?? noDrv;
-    DateTime d = old == null ? DateTime.now() : DateTime.parse(old['date']);
-
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(builder: (ctx, set) {
-        final cats = t == 'in' ? inCats : outCats;
-        if (t != 'trip' && !cats.contains(cat)) cat = cats.first;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(ctx).viewInsets.bottom + 16),
-          child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'out', label: Text('খরচ')),
-                  ButtonSegment(value: 'in', label: Text('আয়')),
-                  ButtonSegment(value: 'trip', label: Text('ট্রিপ')),
-                ],
-                selected: {t},
-                onSelectionChanged: (v) => set(() => t = v.first),
-              ),
-              TextField(
-                  controller: carC,
-                  decoration: const InputDecoration(labelText: 'গাড়ির নাম/নম্বর')),
-              if (t != 'trip')
-                DropdownButtonFormField<String>(
-                  value: cat,
-                  decoration: const InputDecoration(labelText: 'ধরন'),
-                  items: cats.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-                  onChanged: (v) => set(() => cat = v!),
-                ),
-              TextField(
-                  controller: amtC,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                      labelText: t == 'trip' ? 'ট্রিপের ভাড়া/আয় (৳)' : 'টাকার পরিমাণ (৳)')),
-              if (t == 'trip')
-                TextField(
-                    controller: costC,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                        labelText: 'এই ট্রিপের খরচ (তেল/টোল/পার্কিং) (৳)')),
-              if (t != 'out')
-                TextField(
-                    controller: dueC,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(labelText: 'বাকি আছে (থাকলে) (৳)')),
-              DropdownButtonFormField<String>(
-                value: drv,
-                decoration: const InputDecoration(labelText: 'ড্রাইভার'),
-                items: <String>{noDrv, ...drivers.keys, drv}
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
-                onChanged: (v) => set(() => drv = v!),
-              ),
-              TextField(
-                  controller: noteC,
-                  decoration: const InputDecoration(labelText: 'নোট/রুট (ঐচ্ছিক)')),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('তারিখ: ${fd(d)}'),
-                trailing: const Icon(Icons.calendar_today),
-                onTap: () async {
-                  final x = await showDatePicker(
-                      context: ctx,
-                      initialDate: d,
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2100));
-                  if (x != null) set(() => d = x);
-                },
-              ),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: () {
-                    final a = double.tryParse(amtC.text.trim());
-                    if (a == null || a <= 0) return;
-                    final e = <String, dynamic>{
-                      'id': old?['id'] ?? DateTime.now().millisecondsSinceEpoch,
-                      'car': carC.text.trim().isEmpty ? 'আমার গাড়ি' : carC.text.trim(),
-                      'type': t,
-                      'cat': t == 'trip' ? 'ট্রিপ' : cat,
-                      'amt': a,
-                      'cost': t == 'trip' ? (double.tryParse(costC.text.trim()) ?? 0) : 0,
-                      'due': t == 'out' ? 0 : (double.tryParse(dueC.text.trim()) ?? 0),
-                      'driver': drv == noDrv ? null : drv,
-                      'note': noteC.text.trim(),
-                      'date': d.toIso8601String(),
-                    };
-                    if (old != null) items.removeWhere((x) => x['id'] == old['id']);
-                    items.add(e);
-                    save();
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text('সংরক্ষণ করুন'),
-                ),
-              ),
-            ]),
-          ),
-        );
-      }),
+    final result = await Navigator.push<M>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AddEditPage(
+          old: old,
+          cars: cars,
+          currentCar: car,
+          drivers: drivers.keys.toList(),
+        ),
+      ),
     );
+    if (result != null) {
+      if (old != null) items.removeWhere((x) => x['id'] == old['id']);
+      items.add(result);
+      save();
+    }
   }
 
   // ---------- drivers ----------
@@ -282,8 +183,9 @@ class _HomeState extends State<Home> {
     final sal = drivers[n] ?? 0;
     final paid = sEx(mine.where((e) => e['cat'] == 'ড্রাইভার বেতন'));
     final adv = sEx(mine.where((e) => e['cat'] == 'ড্রাইভার অগ্রিম'));
-    final trips = mine.where((e) => e['type'] == 'trip').toList();
-    final bal = sal - paid - adv;
+    final tripPays = mine.fold<double>(0, (s, e) => s + n0(e['driver_pay']));
+    final trips = mine.where((e) => e['type'] == 'trip' || e['type'] == 'self').toList();
+    final bal = sal - paid - adv - tripPays;
     return Card(
       margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
       child: Padding(
@@ -302,10 +204,11 @@ class _HomeState extends State<Home> {
                 }),
           ]),
           Text('মাসিক বেতন: ৳${fm(sal)}'),
-          Text('এই মাসে ট্রিপ: ${trips.length} টি  •  ভাড়া আদায়: ৳${fm(sIn(trips))}'),
-          Text('বেতন দিয়েছি: ৳${fm(paid)}  •  অগ্রিম: ৳${fm(adv)}'),
+          Text('এই মাসে ট্রিপ/ব্যবহার: ${trips.length} টি'),
+          Text('ট্রিপ থেকে দিয়েছি: ৳${fm(tripPays)}'),
+          Text('বেতন দিয়েছি: ৳\( {fm(paid)}  •  অগ্রিম: ৳ \){fm(adv)}'),
           const SizedBox(height: 4),
-          Text(bal >= 0 ? 'বাকি বেতন: ৳${fm(bal)}' : 'বেশি দেওয়া হয়েছে: ৳${fm(-bal)}',
+          Text(bal >= 0 ? 'বাকি: ৳\( {fm(bal)}' : 'বেশি দেওয়া হয়েছে: ৳ \){fm(-bal)}',
               style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: bal > 0 ? Colors.deepOrange : Colors.teal)),
@@ -328,73 +231,54 @@ class _HomeState extends State<Home> {
       if (drivers.isEmpty)
         const Padding(
             padding: EdgeInsets.all(24),
-            child: Text('ড্রাইভার যোগ করলে তার বেতন, অগ্রিম ও ট্রিপের হিসাব এখানে দেখা যাবে।',
-                textAlign: TextAlign.center)),
+            child: Text('ড্রাইভার যোগ করলে তার বেতন, অগ্রিম ও ট্রিপের হিসাব এখানে দেখা যাবে।')),
       for (final n in drivers.keys) drvCard(n, m),
+      const SizedBox(height: 80),
     ]);
   }
 
-  // ---------- reminders ----------
+  Widget monthNav() => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        IconButton(
+            onPressed: () => setState(() => month = DateTime(month.year, month.month - 1)),
+            icon: const Icon(Icons.chevron_left)),
+        Text('\( {month.month}/ \){month.year}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        IconButton(
+            onPressed: () => setState(() => month = DateTime(month.year, month.month + 1)),
+            icon: const Icon(Icons.chevron_right)),
+      ]);
+
   Future<void> addRem() async {
     final t = TextEditingController();
     DateTime d = DateTime.now().add(const Duration(days: 30));
-    await showDialog(
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, set) => AlertDialog(
-          title: const Text('নতুন রিমাইন্ডার'),
-          content: Column(mainAxisSize: MainAxisSize.min, children: [
-            TextField(
-                controller: t,
-                decoration: const InputDecoration(
-                    labelText: 'কী? (ফিটনেস, ইনস্যুরেন্স, মবিল চেঞ্জ...)')),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text('তারিখ: ${fd(d)}'),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final x = await showDatePicker(
-                    context: ctx,
-                    initialDate: d,
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2100));
-                if (x != null) set(() => d = x);
-              },
-            ),
-          ]),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('বাতিল')),
-            TextButton(
-              onPressed: () {
-                if (t.text.trim().isEmpty) return;
-                rem.add({
-                  'id': DateTime.now().millisecondsSinceEpoch,
-                  'title': t.text.trim(),
-                  'date': d.toIso8601String()
-                });
-                save();
-                Navigator.pop(ctx);
-              },
-              child: const Text('সংরক্ষণ'),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => StatefulBuilder(builder: (ctx, set) => AlertDialog(
+            title: const Text('রিমাইন্ডার যোগ'),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(controller: t, decoration: const InputDecoration(labelText: 'কীসের রিমাইন্ডার?')),
+              ListTile(
+                title: Text('তারিখ: ${fd(d)}'),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final x = await showDatePicker(
+                      context: ctx, initialDate: d, firstDate: DateTime.now(), lastDate: DateTime(2100));
+                  if (x != null) set(() => d = x);
+                },
+              ),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('বাতিল')),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('যোগ')),
+            ],
+          )),
     );
+    if (ok == true && t.text.trim().isNotEmpty) {
+      rem.add({'id': DateTime.now().millisecondsSinceEpoch, 'title': t.text.trim(), 'date': d.toIso8601String()});
+      save();
+    }
   }
 
-  // ---------- common widgets ----------
-  Widget monthNav() => Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        IconButton(
-            icon: const Icon(Icons.chevron_left),
-            onPressed: () => setState(() => month = DateTime(month.year, month.month - 1))),
-        Text(mk(month), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        IconButton(
-            icon: const Icon(Icons.chevron_right),
-            onPressed: () => setState(() => month = DateTime(month.year, month.month + 1))),
-      ]);
-
-  Widget sumCard(String title, List<M> l, {String? extra}) {
+  Widget sumCard(String title, Iterable<M> l, {String? extra}) {
     final i = sIn(l), o = sEx(l), pr = i - o;
     return Card(
       margin: const EdgeInsets.fromLTRB(12, 6, 12, 6),
@@ -419,7 +303,6 @@ class _HomeState extends State<Home> {
     );
   }
 
-  // ---------- tabs ----------
   Widget dash() {
     final l = shown, m = ofMonth(l, month);
     final trips = m.where((e) => e['type'] == 'trip').length;
@@ -448,8 +331,8 @@ class _HomeState extends State<Home> {
                 color: days <= 7 ? Colors.red : Colors.teal),
             title: Text(r['title']),
             subtitle: Text(days < 0
-                ? 'মেয়াদ শেষ ${-days} দিন আগে (${fd(DateTime.parse(r['date']))})'
-                : '$days দিন বাকি (${fd(DateTime.parse(r['date']))})'),
+                ? 'মেয়াদ শেষ \( {-days} দিন আগে ( \){fd(DateTime.parse(r['date']))})'
+                : '\( days দিন বাকি ( \){fd(DateTime.parse(r['date']))})'),
             trailing: IconButton(
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () async {
@@ -474,22 +357,30 @@ class _HomeState extends State<Home> {
       itemCount: l.length,
       itemBuilder: (c, i) {
         final e = l[i];
-        final trip = e['type'] == 'trip', isIn = e['type'] == 'in';
+        final trip = e['type'] == 'trip';
+        final self = e['type'] == 'self';
+        final isIn = e['type'] == 'in';
         final d = DateTime.parse(e['date']);
+        final profit = trip ? (n0(e['amt']) - n0(e['cost'])) : 0.0;
         final parts = <String>[
           '${e['car']}',
           fd(d),
           if (e['driver'] != null) 'ড্রাইভার: ${e['driver']}',
-          if (trip) 'ভাড়া ৳${fm(n0(e['amt']))} − খরচ ৳${fm(n0(e['cost']))}',
+          if (trip) 'ভাড়া ৳\( {fm(n0(e['amt']))} − খরচ ৳ \){fm(n0(e['cost']))}',
+          if (self) 'নিজে ব্যবহার খরচ ৳${fm(n0(e['cost']))}',
+          if (n0(e['driver_pay']) > 0) 'ড্রাইভার পেয়েছে ৳${fm(n0(e['driver_pay']))}',
           if (n0(e['due']) > 0) 'বাকি ৳${fm(n0(e['due']))}',
           if ((e['note'] ?? '') != '') '${e['note']}',
         ];
         return ListTile(
-          leading: Icon(trip ? Icons.route : (isIn ? Icons.arrow_downward : Icons.arrow_upward),
-              color: trip ? Colors.indigo : (isIn ? Colors.green : Colors.red)),
+          leading: Icon(
+              trip ? Icons.route : (self ? Icons.directions_car : (isIn ? Icons.arrow_downward : Icons.arrow_upward)),
+              color: trip ? Colors.indigo : (self ? Colors.orange : (isIn ? Colors.green : Colors.red))),
           title: Text(trip
-              ? 'ট্রিপ  •  লাভ ৳${fm(n0(e['amt']) - n0(e['cost']))}'
-              : '${e['cat']}  •  ৳${fm(n0(e['amt']))}'),
+              ? 'ট্রিপ  •  লাভ ৳${fm(profit)}'
+              : self
+                  ? 'নিজে ব্যবহার  •  খরচ ৳${fm(n0(e['cost']))}'
+                  : '\( {e['cat']}  •  ৳ \){fm(n0(e['amt']))}'),
           subtitle: Text(parts.join('  •  ')),
           onTap: () => addEdit(e),
           trailing: IconButton(
@@ -516,8 +407,9 @@ class _HomeState extends State<Home> {
     for (final e in l) {
       if (e['type'] == 'out') {
         cats[e['cat']] = (cats[e['cat']] ?? 0) + n0(e['amt']);
-      } else if (e['type'] == 'trip' && n0(e['cost']) > 0) {
-        cats['ট্রিপ খরচ'] = (cats['ট্রিপ খরচ'] ?? 0) + n0(e['cost']);
+      } else if ((e['type'] == 'trip' || e['type'] == 'self') && n0(e['cost']) > 0) {
+        cats[e['type'] == 'trip' ? 'ট্রিপ খরচ' : 'নিজে ব্যবহার'] =
+            (cats[e['type'] == 'trip' ? 'ট্রিপ খরচ' : 'নিজে ব্যবহার'] ?? 0) + n0(e['cost']);
       }
     }
     final cl = cats.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
@@ -527,7 +419,7 @@ class _HomeState extends State<Home> {
       sumCard('সর্বমোট লাভ/লোকসান', l,
           extra: trips.isEmpty
               ? null
-              : 'মোট ট্রিপ ${trips.length} টি  •  প্রতি ট্রিপে গড় লাভ ৳${fm(tp / trips.length)}'),
+              : 'মোট ট্রিপ \( {trips.length} টি  •  প্রতি ট্রিপে গড় লাভ ৳ \){fm(tp / trips.length)}'),
       head('মাসভিত্তিক হিসাব'),
       for (final k in keys)
         Builder(builder: (c) {
@@ -537,8 +429,8 @@ class _HomeState extends State<Home> {
             title: Text(k),
             isThreeLine: true,
             subtitle: Text(
-                'আয় ৳${fm(sIn(mm))}  •  খরচ ৳${fm(sEx(mm))}\nসার্ভিস/মেরামত/টায়ার ৳${fm(svcOf(mm))}'),
-            trailing: Text('${pr >= 0 ? 'লাভ' : 'লোকসান'}\n৳${fm(pr.abs())}',
+                'আয় ৳\( {fm(sIn(mm))}  •  খরচ ৳ \){fm(sEx(mm))}\nসার্ভিস/মেরামত/টায়ার ৳${fm(svcOf(mm))}'),
+            trailing: Text('\( {pr >= 0 ? 'লাভ' : 'লোকসান'}\n৳ \){fm(pr.abs())}',
                 textAlign: TextAlign.right,
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -552,10 +444,9 @@ class _HomeState extends State<Home> {
     ]);
   }
 
-  // ---------- backup ----------
   Future<void> backup() async {
     await Clipboard.setData(ClipboardData(
-        text: jsonEncode({'v': 2, 'entries': items, 'drivers': drivers, 'rem': rem})));
+        text: jsonEncode({'v': 3, 'entries': items, 'drivers': drivers, 'rem': rem})));
     msg('ব্যাকআপ কপি হয়েছে। WhatsApp/Notes-এ পেস্ট করে রাখুন।');
   }
 
@@ -617,6 +508,174 @@ class _HomeState extends State<Home> {
           NavigationDestination(icon: Icon(Icons.person), label: 'ড্রাইভার'),
           NavigationDestination(icon: Icon(Icons.bar_chart), label: 'রিপোর্ট'),
         ],
+      ),
+    );
+  }
+}
+
+// ==================== নতুন ফুল পেজ ====================
+class AddEditPage extends StatefulWidget {
+  final M? old;
+  final List<String> cars;
+  final String currentCar;
+  final List<String> drivers;
+  const AddEditPage({super.key, this.old, required this.cars, required this.currentCar, required this.drivers});
+
+  @override
+  State<AddEditPage> createState() => _AddEditPageState();
+}
+
+class _AddEditPageState extends State<AddEditPage> {
+  late String t;
+  late TextEditingController carC, amtC, costC, dueC, noteC, driverPayC;
+  late String cat, drv;
+  late DateTime d;
+
+  @override
+  void initState() {
+    super.initState();
+    final old = widget.old;
+    t = (old?['type'] ?? 'out') as String;
+    carC = TextEditingController(
+        text: old?['car'] ??
+            (widget.currentCar != allCars ? widget.currentCar : (widget.cars.isNotEmpty ? widget.cars.first : 'আমার গাড়ি')));
+    amtC = TextEditingController(text: old == null ? '' : fm(n0(old['amt'])));
+    costC = TextEditingController(text: old == null || n0(old['cost']) == 0 ? '' : fm(n0(old['cost'])));
+    dueC = TextEditingController(text: old == null || n0(old['due']) == 0 ? '' : fm(n0(old['due'])));
+    noteC = TextEditingController(text: old?['note'] ?? '');
+    driverPayC = TextEditingController(text: old == null || n0(old['driver_pay']) == 0 ? '' : fm(n0(old['driver_pay'])));
+    cat = old?['cat'] ?? outCats.first;
+    drv = old?['driver'] ?? noDrv;
+    d = old == null ? DateTime.now() : DateTime.parse(old['date']);
+  }
+
+  @override
+  void dispose() {
+    carC.dispose();
+    amtC.dispose();
+    costC.dispose();
+    dueC.dispose();
+    noteC.dispose();
+    driverPayC.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cats = t == 'in' ? inCats : outCats;
+    if (t != 'trip' && t != 'self' && !cats.contains(cat)) cat = cats.first;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.old == null ? 'নতুন হিসাব যোগ করুন' : 'হিসাব এডিট করুন'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(children: [
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'out', label: Text('খরচ')),
+              ButtonSegment(value: 'in', label: Text('আয়')),
+              ButtonSegment(value: 'trip', label: Text('ট্রিপ')),
+              ButtonSegment(value: 'self', label: Text('নিজে ব্যবহার')),
+            ],
+            selected: {t},
+            onSelectionChanged: (v) => setState(() => t = v.first),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+              controller: carC,
+              decoration: const InputDecoration(labelText: 'গাড়ির নাম/নম্বর', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          if (t != 'trip' && t != 'self')
+            DropdownButtonFormField<String>(
+              value: cat,
+              decoration: const InputDecoration(labelText: 'ধরন', border: OutlineInputBorder()),
+              items: cats.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+              onChanged: (v) => setState(() => cat = v!),
+            ),
+          if (t != 'trip' && t != 'self') const SizedBox(height: 12),
+          TextField(
+              controller: amtC,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                  labelText: t == 'trip' ? 'ট্রিপের ভাড়া/আয় (৳)' : (t == 'self' ? 'খরচের পরিমাণ (৳)' : 'টাকার পরিমাণ (৳)'),
+                  border: const OutlineInputBorder())),
+          const SizedBox(height: 12),
+          if (t == 'trip' || t == 'self')
+            TextField(
+                controller: costC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'খরচ (তেল/টোল/পার্কিং ইত্যাদি) (৳)', border: OutlineInputBorder())),
+          if (t == 'trip' || t == 'self') const SizedBox(height: 12),
+          if (t == 'trip' || t == 'self')
+            TextField(
+                controller: driverPayC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                    labelText: 'ড্রাইভারকে দিয়েছি / পাবে (৳)', border: OutlineInputBorder())),
+          if (t == 'trip' || t == 'self') const SizedBox(height: 12),
+          if (t != 'out' && t != 'self')
+            TextField(
+                controller: dueC,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(labelText: 'বাকি আছে (থাকলে) (৳)', border: OutlineInputBorder())),
+          if (t != 'out' && t != 'self') const SizedBox(height: 12),
+          DropdownButtonFormField<String>(
+            value: drv,
+            decoration: const InputDecoration(labelText: 'ড্রাইভার', border: OutlineInputBorder()),
+            items: <String>{noDrv, ...widget.drivers, drv}
+                .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                .toList(),
+            onChanged: (v) => setState(() => drv = v!),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+              controller: noteC,
+              decoration: const InputDecoration(labelText: 'নোট/রুট (ঐচ্ছিক)', border: OutlineInputBorder())),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('তারিখ: ${fd(d)}'),
+            trailing: const Icon(Icons.calendar_today),
+            onTap: () async {
+              final x = await showDatePicker(
+                  context: context, initialDate: d, firstDate: DateTime(2020), lastDate: DateTime(2100));
+              if (x != null) setState(() => d = x);
+            },
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: FilledButton.icon(
+              onPressed: () {
+                final a = double.tryParse(amtC.text.trim());
+                if (a == null || a <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('সঠিক পরিমাণ দিন')));
+                  return;
+                }
+                final e = <String, dynamic>{
+                  'id': widget.old?['id'] ?? DateTime.now().millisecondsSinceEpoch,
+                  'car': carC.text.trim().isEmpty ? 'আমার গাড়ি' : carC.text.trim(),
+                  'type': t,
+                  'cat': t == 'trip' ? 'ট্রিপ' : (t == 'self' ? 'নিজে ব্যবহার' : cat),
+                  'amt': a,
+                  'cost': (t == 'trip' || t == 'self') ? (double.tryParse(costC.text.trim()) ?? 0) : 0,
+                  'due': (t == 'out' || t == 'self') ? 0 : (double.tryParse(dueC.text.trim()) ?? 0),
+                  'driver': drv == noDrv ? null : drv,
+                  'driver_pay': (t == 'trip' || t == 'self') ? (double.tryParse(driverPayC.text.trim()) ?? 0) : 0,
+                  'note': noteC.text.trim(),
+                  'date': d.toIso8601String(),
+                };
+                Navigator.pop(context, e);
+              },
+              icon: const Icon(Icons.save),
+              label: const Text('সংরক্ষণ করুন'),
+            ),
+          ),
+        ]),
       ),
     );
   }

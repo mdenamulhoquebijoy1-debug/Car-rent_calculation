@@ -1,7 +1,7 @@
 name: car_hisab
 description: Gari-r hisab
 publish_to: none
-version: 1.0.4+5
+version: 1.0.3+5
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -10,6 +10,11 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.2.0
+  http: ^1.2.0
+  package_info_plus: ^8.0.0
+  path_provider: ^2.1.0
+  open_file: ^3.5.0
+  permission_handler: ^11.3.0
 
 flutter:
   uses-material-design: true

@@ -140,7 +140,6 @@ class _HomeState extends State<Home> {
     }
   }
 
-  // ---------- drivers ----------
   Future<void> editDriver([String? old]) async {
     final n = TextEditingController(text: old ?? '');
     final s = TextEditingController(text: old == null ? '' : fm(drivers[old] ?? 0));
@@ -513,7 +512,6 @@ class _HomeState extends State<Home> {
   }
 }
 
-// ==================== নতুন ফুল পেজ ====================
 class AddEditPage extends StatefulWidget {
   final M? old;
   final List<String> cars;
